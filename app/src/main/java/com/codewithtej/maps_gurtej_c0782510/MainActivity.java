@@ -95,8 +95,11 @@ public class MainActivity extends AppCompatActivity {
         else if (markers.size() == 1){
             title = "B";
         }
-        else{
+        else if (markers.size() == 2){
             title = "C";
+        }
+        else{
+            title = "D";
         }
         MarkerOptions option  = new MarkerOptions().position(latLng).title(title);
         if(1 == 0){
@@ -106,10 +109,10 @@ public class MainActivity extends AppCompatActivity {
             if (markers.size() != 0){
            //     findNearestMarker(latLng);
             }
-            if(markers.size() < 3){
+            if(markers.size() < 4){
                 markers.add(myMap.addMarker(option));
-                if(markers.size() == 3)
-                    drawTriangle();
+                if(markers.size() == 4)
+                    drawQuadrilateral();
 
             }
             else{
@@ -123,12 +126,12 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
-    private void drawTriangle() {
+    private void drawQuadrilateral() {
         PolygonOptions option = new PolygonOptions()
-                .fillColor(0x80FF0000)
-                .strokeColor(Color.GREEN)
+                .fillColor(0x5900FF00)
+                .strokeColor(Color.RED)
                 .strokeWidth(5);
-        for (int i=0; i<3; i++) {
+        for (int i=0; i<4; i++) {
             option.add(markers.get(i).getPosition());
         }
 
