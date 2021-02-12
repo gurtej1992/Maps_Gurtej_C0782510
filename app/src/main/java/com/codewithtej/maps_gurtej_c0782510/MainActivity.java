@@ -11,6 +11,7 @@ import android.graphics.Color;
 import android.location.Location;
 import android.os.Bundle;
 import android.util.Log;
+import android.widget.Toast;
 
 import com.google.android.gms.location.FusedLocationProviderClient;
 import com.google.android.gms.location.LocationServices;
@@ -18,16 +19,20 @@ import com.google.android.gms.maps.CameraUpdateFactory;
 import com.google.android.gms.maps.GoogleMap;
 import com.google.android.gms.maps.OnMapReadyCallback;
 import com.google.android.gms.maps.SupportMapFragment;
+import com.google.android.gms.maps.model.BitmapDescriptorFactory;
 import com.google.android.gms.maps.model.LatLng;
 import com.google.android.gms.maps.model.Marker;
 import com.google.android.gms.maps.model.MarkerOptions;
 import com.google.android.gms.maps.model.Polygon;
 import com.google.android.gms.maps.model.PolygonOptions;
+import com.google.android.gms.tasks.OnFailureListener;
 import com.google.android.gms.tasks.OnSuccessListener;
 import com.google.android.gms.tasks.Task;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
@@ -37,9 +42,11 @@ public class MainActivity extends AppCompatActivity {
     FusedLocationProviderClient client;
     private GoogleMap myMap;
     private Polygon shape;
+
+    int smallestDistance = 6000;
     List<Marker> markers = new ArrayList();
-    ArrayList<Float> arr = new ArrayList();
-    Map<Marker,Float> nearMarker = new TreeMap<Marker,Float>();
+    List<Float> arr = new ArrayList();
+    Map<Float,Marker> nearMarker = new HashMap<>();
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -69,7 +76,8 @@ public class MainActivity extends AppCompatActivity {
                             LatLng latLng = new LatLng(location.getLatitude(),location.getLongitude());
                             MarkerOptions options = new MarkerOptions()
                                     .position(latLng)
-                                    .title("Here I am");
+                                    .title("Here I am")
+                                    .icon(BitmapDescriptorFactory.fromResource(R.drawable.userlocation));
                             googleMap.animateCamera(CameraUpdateFactory.newLatLngZoom(latLng,9));
                             googleMap.addMarker(options);
 
@@ -83,6 +91,12 @@ public class MainActivity extends AppCompatActivity {
                         }
                     });
                 }
+            }
+        });
+        task.addOnFailureListener(new OnFailureListener() {
+            @Override
+            public void onFailure(@NonNull Exception e) {
+                Log.d("xx",""+e.getLocalizedMessage());
             }
         });
     }
@@ -107,7 +121,23 @@ public class MainActivity extends AppCompatActivity {
         }
         else{
             if (markers.size() != 0){
-           //     findNearestMarker(latLng);
+                findNearestMarker(latLng);
+                if(smallestDistance >= arr.get(0)){
+                    Marker near = nearMarker.get(arr.get(0));
+                    near.remove();
+                    for (int i=0; i<markers.size(); i++) {
+                        if(markers.get(i) == near){
+                            markers.get(i).remove();
+                            markers.remove(i);
+                            if(shape != null){
+                                shape.remove();
+                                shape = null;
+                            }
+                        }
+                    }
+                    return;
+                }
+
             }
             if(markers.size() < 4){
                 markers.add(myMap.addMarker(option));
@@ -119,8 +149,11 @@ public class MainActivity extends AppCompatActivity {
                 for (Marker marker: markers)
                     marker.remove();
                 markers.clear();
-                shape.remove();
-                shape = null;
+                if(shape != null){
+                    shape.remove();
+                    shape = null;
+                }
+
                 addMarker(latLng);
             }
         }
@@ -137,26 +170,28 @@ public class MainActivity extends AppCompatActivity {
 
         shape = myMap.addPolygon(option);
     }
-//    Marker findNearestMarker(LatLng position){
-//        int smallestDistance = 6000;
-//        for(Marker mark : markers){
-//            float[] distance = new float[1];
-//            LatLng markerPosition = mark.getPosition();
-//            Location.distanceBetween(markerPosition.latitude,markerPosition.longitude,position.latitude,position.longitude,distance);
-//            arr.add(distance[0]);
-//            Log.e("Fish","--"+distance[0]);
-//            nearMarker.put(mark,distance[0]);
-//        }
-//        Collections.sort(arr);
-//
-//        return  arr[0];
-//    }
+    void findNearestMarker(LatLng position){
+        nearMarker.clear();
+        arr.clear();
+        for(Marker mark : markers){
+            float[] distance = new float[1];
+            LatLng markerPosition = mark.getPosition();
+            Location.distanceBetween(markerPosition.latitude,markerPosition.longitude,position.latitude,position.longitude,distance);
+            nearMarker.put(distance[0],mark);
+            arr.add(distance[0]);
+        }
+        Collections.sort(arr);
+    }
     @Override
     public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults);
         if (requestCode == 101){
             if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED){
                 getCurrentLocation();
+            }
+            else{
+                Toast.makeText(this, "This is my Toast message!",
+                        Toast.LENGTH_LONG).show();
             }
         }
     }
