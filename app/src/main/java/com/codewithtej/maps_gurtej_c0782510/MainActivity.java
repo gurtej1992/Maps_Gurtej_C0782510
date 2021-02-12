@@ -34,23 +34,22 @@ import com.google.android.gms.tasks.Task;
 
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
-import java.util.TreeMap;
 
-public class MainActivity extends AppCompatActivity implements GoogleMap.OnMarkerClickListener,GoogleMap.OnMarkerDragListener,GoogleMap.OnPolygonClickListener {
+public class MainActivity extends AppCompatActivity implements GoogleMap.OnMarkerClickListener,GoogleMap.OnMarkerDragListener,GoogleMap.OnPolygonClickListener, GoogleMap.OnPolylineClickListener {
     SupportMapFragment smf;
     FusedLocationProviderClient client;
     private GoogleMap myMap;
     private Polygon shape;
     Location userLocation;
     int smallestDistance = 6000;
-    List<Marker> markers = new ArrayList();
-    List<Float> arr = new ArrayList();
+    ArrayList<Marker> markers = new ArrayList();
+    ArrayList<Float> arr = new ArrayList();
     Map<Float,Marker> nearMarker = new HashMap<>();
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -113,6 +112,7 @@ public class MainActivity extends AppCompatActivity implements GoogleMap.OnMarke
         myMap.setOnMarkerClickListener(this);
         myMap.setOnMarkerDragListener(this);
         myMap.setOnPolygonClickListener(this);
+        myMap.setOnPolylineClickListener(this);
         String title;
         if (markers.size() == 0){
             title = "A";
@@ -139,6 +139,7 @@ public class MainActivity extends AppCompatActivity implements GoogleMap.OnMarke
                 findNearestMarker(latLng);
                 if(smallestDistance >= arr.get(0)){
                     Marker near = nearMarker.get(arr.get(0));
+                    assert near != null;
                     near.remove();
                     for (int i=0; i<markers.size(); i++) {
                         if(markers.get(i) == near){
@@ -177,10 +178,12 @@ public class MainActivity extends AppCompatActivity implements GoogleMap.OnMarke
         PolygonOptions option = new PolygonOptions()
                 .fillColor(0x5900FF00)
                 .strokeColor(Color.RED)
-                .strokeWidth(5)
+                .strokeWidth(10)
                 .clickable(true);
+
         for (int i=0; i<4; i++) {
             option.add(markers.get(i).getPosition());
+            Log.e("___>", ""+ markers.get(i).getPosition());
         }
         shape = myMap.addPolygon(option);
     }
@@ -272,9 +275,15 @@ public class MainActivity extends AppCompatActivity implements GoogleMap.OnMarke
             Location.distanceBetween(locations.get(0).latitude,locations.get(0).longitude,locations.get(1).latitude,locations.get(1).longitude,distanceAB);
             Location.distanceBetween(locations.get(1).latitude,locations.get(1).longitude,locations.get(2).latitude,locations.get(2).longitude,distanceBC);
             Location.distanceBetween(locations.get(2).latitude,locations.get(2).longitude,locations.get(1).latitude,locations.get(1).longitude,distanceCA);
-            Float totalDistance = distanceAB[0] + distanceBC[0] + distanceCA[0];
+            float totalDistance = distanceAB[0] + distanceBC[0] + distanceCA[0];
             Toast.makeText(this, "Total Distance From all four points is "+totalDistance+ " meters",
                     Toast.LENGTH_LONG).show();
         }
+    }
+
+    @Override
+    public void onPolylineClick(Polyline polyline) {
+        Toast.makeText(this, "WOOWOWOOWOW",
+                Toast.LENGTH_LONG).show();
     }
 }
