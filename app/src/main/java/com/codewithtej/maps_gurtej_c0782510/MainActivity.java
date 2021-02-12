@@ -8,6 +8,8 @@ import android.Manifest;
 import android.annotation.SuppressLint;
 import android.content.pm.PackageManager;
 import android.graphics.Color;
+import android.location.Address;
+import android.location.Geocoder;
 import android.location.Location;
 import android.os.Bundle;
 import android.util.Log;
@@ -25,24 +27,27 @@ import com.google.android.gms.maps.model.Marker;
 import com.google.android.gms.maps.model.MarkerOptions;
 import com.google.android.gms.maps.model.Polygon;
 import com.google.android.gms.maps.model.PolygonOptions;
+import com.google.android.gms.maps.model.Polyline;
 import com.google.android.gms.tasks.OnFailureListener;
 import com.google.android.gms.tasks.OnSuccessListener;
 import com.google.android.gms.tasks.Task;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.TreeMap;
 
-public class MainActivity extends AppCompatActivity {
+public class MainActivity extends AppCompatActivity implements GoogleMap.OnMarkerClickListener,GoogleMap.OnMarkerDragListener,GoogleMap.OnPolygonClickListener {
     SupportMapFragment smf;
     FusedLocationProviderClient client;
     private GoogleMap myMap;
     private Polygon shape;
-
+    Location userLocation;
     int smallestDistance = 6000;
     List<Marker> markers = new ArrayList();
     List<Float> arr = new ArrayList();
@@ -69,6 +74,8 @@ public class MainActivity extends AppCompatActivity {
             @Override
             public void onSuccess(final Location location) {
                 if(location != null){
+                    userLocation = location;
+
                     smf.getMapAsync(new OnMapReadyCallback() {
                         @Override
                         public void onMapReady(GoogleMap googleMap) {
@@ -86,6 +93,7 @@ public class MainActivity extends AppCompatActivity {
                                 @Override
                                 public void onMapLongClick(LatLng latLng) {
                                     addMarker(latLng);
+
                                 }
                             });
                         }
@@ -102,6 +110,9 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void addMarker(LatLng latLng) {
+        myMap.setOnMarkerClickListener(this);
+        myMap.setOnMarkerDragListener(this);
+        myMap.setOnPolygonClickListener(this);
         String title;
         if (markers.size() == 0){
             title = "A";
@@ -115,11 +126,15 @@ public class MainActivity extends AppCompatActivity {
         else{
             title = "D";
         }
-        MarkerOptions option  = new MarkerOptions().position(latLng).title(title);
-        if(1 == 0){
-        //    findNearestMarker(latLng);
-        }
-        else{
+        float[] distance = new float[1];
+        Location.distanceBetween(latLng.latitude,latLng.longitude,userLocation.getLatitude(),userLocation.getLongitude(),distance);
+        MarkerOptions option  = new MarkerOptions()
+                .position(latLng)
+                .title(title)
+                .snippet("Distance From user location is "+distance[0] + " meters.")
+                .icon(BitmapDescriptorFactory.fromResource(R.drawable.marker))
+                .draggable(true);
+
             if (markers.size() != 0){
                 findNearestMarker(latLng);
                 if(smallestDistance >= arr.get(0)){
@@ -157,17 +172,16 @@ public class MainActivity extends AppCompatActivity {
                 addMarker(latLng);
             }
         }
-    }
 
     private void drawQuadrilateral() {
         PolygonOptions option = new PolygonOptions()
                 .fillColor(0x5900FF00)
                 .strokeColor(Color.RED)
-                .strokeWidth(5);
+                .strokeWidth(5)
+                .clickable(true);
         for (int i=0; i<4; i++) {
             option.add(markers.get(i).getPosition());
         }
-
         shape = myMap.addPolygon(option);
     }
     void findNearestMarker(LatLng position){
@@ -181,6 +195,25 @@ public class MainActivity extends AppCompatActivity {
             arr.add(distance[0]);
         }
         Collections.sort(arr);
+    }
+    String retrieveAddress(LatLng coordinate){
+        Geocoder geocoder;
+        List<Address> addresses;
+        geocoder = new Geocoder(this, Locale.getDefault());
+        String completeAddress;
+        try {
+            addresses = geocoder.getFromLocation(coordinate.latitude, coordinate.longitude, 1);
+            String address = addresses.get(0).getAddressLine(0); // If any additional address line present than only, check with max available address lines by getMaxAddressLineIndex()
+            String city = addresses.get(0).getLocality();
+            String state = addresses.get(0).getAdminArea();
+            String postalCode = addresses.get(0).getPostalCode();
+            completeAddress = address + ", "+ city+", "+state+", Postal Code :- "+postalCode;
+            //String knownName = addresses.get(0).getFeatureName();// Here 1 represent max location result to returned, by documents it recommended 1 to 5
+        } catch (IOException e) {
+            completeAddress = "Not provided";
+            e.printStackTrace();
+        }
+        return completeAddress;
     }
     @Override
     public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
@@ -196,4 +229,52 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
+    @Override
+    public boolean onMarkerClick(Marker marker) {
+        String add = retrieveAddress(marker.getPosition());
+        Toast.makeText(this, add,
+                Toast.LENGTH_LONG).show();
+//        Log.e("marker",marker.getSnippet());
+    return false;
+    }
+
+    @Override
+    public void onMarkerDragStart(Marker marker) {
+        markers.remove(marker);
+    }
+
+    @Override
+    public void onMarkerDrag(Marker marker) {
+
+    }
+
+    @Override
+    public void onMarkerDragEnd(Marker marker) {
+        markers.add(marker);
+        if(shape != null){
+            shape.remove();
+            shape = null;
+        }
+        if(markers.size() == 4){
+            drawQuadrilateral();
+        }
+
+    }
+
+    @Override
+    public void onPolygonClick(Polygon polygon) {
+        if(markers.size() == 4){
+            List<LatLng> locations = polygon.getPoints();
+            locations.remove(locations.size()-1);
+            float[] distanceAB = new float[1];
+            float[] distanceBC = new float[1];
+            float[] distanceCA = new float[1];
+            Location.distanceBetween(locations.get(0).latitude,locations.get(0).longitude,locations.get(1).latitude,locations.get(1).longitude,distanceAB);
+            Location.distanceBetween(locations.get(1).latitude,locations.get(1).longitude,locations.get(2).latitude,locations.get(2).longitude,distanceBC);
+            Location.distanceBetween(locations.get(2).latitude,locations.get(2).longitude,locations.get(1).latitude,locations.get(1).longitude,distanceCA);
+            Float totalDistance = distanceAB[0] + distanceBC[0] + distanceCA[0];
+            Toast.makeText(this, "Total Distance From all four points is "+totalDistance+ " meters",
+                    Toast.LENGTH_LONG).show();
+        }
+    }
 }
