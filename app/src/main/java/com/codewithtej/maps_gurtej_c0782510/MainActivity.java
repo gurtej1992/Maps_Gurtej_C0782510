@@ -28,6 +28,7 @@ import com.google.android.gms.maps.model.MarkerOptions;
 import com.google.android.gms.maps.model.Polygon;
 import com.google.android.gms.maps.model.PolygonOptions;
 import com.google.android.gms.maps.model.Polyline;
+import com.google.android.gms.maps.model.PolylineOptions;
 import com.google.android.gms.tasks.OnFailureListener;
 import com.google.android.gms.tasks.OnSuccessListener;
 import com.google.android.gms.tasks.Task;
@@ -45,9 +46,10 @@ public class MainActivity extends AppCompatActivity implements GoogleMap.OnMarke
     SupportMapFragment smf;
     FusedLocationProviderClient client;
     private GoogleMap myMap;
-    private Polygon shape;
+    private Polyline shape;
+    private Polygon shape2;
     Location userLocation;
-    int smallestDistance = 6000;
+    int smallestDistance = 10000;
     ArrayList<Marker> markers = new ArrayList();
     ArrayList<Float> arr = new ArrayList();
     Map<Float,Marker> nearMarker = new HashMap<>();
@@ -66,7 +68,7 @@ public class MainActivity extends AppCompatActivity implements GoogleMap.OnMarke
         }
 
     }
-
+// TO Get current location of user
     private void getCurrentLocation() {
         @SuppressLint("MissingPermission") Task<Location> task = client.getLastLocation();
         task.addOnSuccessListener(new OnSuccessListener<Location>() {
@@ -107,7 +109,7 @@ public class MainActivity extends AppCompatActivity implements GoogleMap.OnMarke
             }
         });
     }
-
+// Adding marker on long press
     private void addMarker(LatLng latLng) {
         myMap.setOnMarkerClickListener(this);
         myMap.setOnMarkerDragListener(this);
@@ -128,10 +130,11 @@ public class MainActivity extends AppCompatActivity implements GoogleMap.OnMarke
         }
         float[] distance = new float[1];
         Location.distanceBetween(latLng.latitude,latLng.longitude,userLocation.getLatitude(),userLocation.getLongitude(),distance);
+        double dis = Math.round((distance[0]/1000) * 100.0) / 100.0;
         MarkerOptions option  = new MarkerOptions()
                 .position(latLng)
                 .title(title)
-                .snippet("Distance From user location is "+distance[0] + " meters.")
+                .snippet("Distance from user : "+dis + " kms.")
                 .icon(BitmapDescriptorFactory.fromResource(R.drawable.marker))
                 .draggable(true);
 
@@ -148,6 +151,8 @@ public class MainActivity extends AppCompatActivity implements GoogleMap.OnMarke
                             if(shape != null){
                                 shape.remove();
                                 shape = null;
+                                shape2.remove();
+                                shape2 = null;
                             }
                         }
                     }
@@ -168,24 +173,38 @@ public class MainActivity extends AppCompatActivity implements GoogleMap.OnMarke
                 if(shape != null){
                     shape.remove();
                     shape = null;
+                    shape2.remove();
+                    shape2 = null;
                 }
 
                 addMarker(latLng);
             }
         }
-
+// Drawing shape
     private void drawQuadrilateral() {
+        PolylineOptions options = new PolylineOptions()
+                .clickable(true);
+        for (int i=0; i<5; i++) {
+            if(i==4){
+                options.add(markers.get(0).getPosition());
+            }
+            else{
+                options.add(markers.get(i).getPosition());
+            }
+        }
+        shape = myMap.addPolyline(options);
+        shape.setColor(Color.RED);
+        shape.setWidth(15);
         PolygonOptions option = new PolygonOptions()
                 .fillColor(0x5900FF00)
-                .strokeColor(Color.RED)
-                .strokeWidth(10)
+                .strokeWidth(0)
                 .clickable(true);
 
         for (int i=0; i<4; i++) {
             option.add(markers.get(i).getPosition());
             Log.e("___>", ""+ markers.get(i).getPosition());
         }
-        shape = myMap.addPolygon(option);
+        shape2 = myMap.addPolygon(option);
     }
     void findNearestMarker(LatLng position){
         nearMarker.clear();
@@ -199,6 +218,7 @@ public class MainActivity extends AppCompatActivity implements GoogleMap.OnMarke
         }
         Collections.sort(arr);
     }
+    // Getting address for given coordinates
     String retrieveAddress(LatLng coordinate){
         Geocoder geocoder;
         List<Address> addresses;
@@ -225,10 +245,6 @@ public class MainActivity extends AppCompatActivity implements GoogleMap.OnMarke
             if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED){
                 getCurrentLocation();
             }
-            else{
-                Toast.makeText(this, "This is my Toast message!",
-                        Toast.LENGTH_LONG).show();
-            }
         }
     }
 
@@ -236,7 +252,7 @@ public class MainActivity extends AppCompatActivity implements GoogleMap.OnMarke
     public boolean onMarkerClick(Marker marker) {
         String add = retrieveAddress(marker.getPosition());
         Toast.makeText(this, add,
-                Toast.LENGTH_LONG).show();
+                Toast.LENGTH_SHORT).show();
 //        Log.e("marker",marker.getSnippet());
     return false;
     }
@@ -257,6 +273,8 @@ public class MainActivity extends AppCompatActivity implements GoogleMap.OnMarke
         if(shape != null){
             shape.remove();
             shape = null;
+            shape2.remove();
+            shape2 = null;
         }
         if(markers.size() == 4){
             drawQuadrilateral();
@@ -268,22 +286,40 @@ public class MainActivity extends AppCompatActivity implements GoogleMap.OnMarke
     public void onPolygonClick(Polygon polygon) {
         if(markers.size() == 4){
             List<LatLng> locations = polygon.getPoints();
-            locations.remove(locations.size()-1);
             float[] distanceAB = new float[1];
             float[] distanceBC = new float[1];
-            float[] distanceCA = new float[1];
+            float[] distanceCD = new float[1];
+            float[] distanceDA = new float[1];
             Location.distanceBetween(locations.get(0).latitude,locations.get(0).longitude,locations.get(1).latitude,locations.get(1).longitude,distanceAB);
             Location.distanceBetween(locations.get(1).latitude,locations.get(1).longitude,locations.get(2).latitude,locations.get(2).longitude,distanceBC);
-            Location.distanceBetween(locations.get(2).latitude,locations.get(2).longitude,locations.get(1).latitude,locations.get(1).longitude,distanceCA);
-            float totalDistance = distanceAB[0] + distanceBC[0] + distanceCA[0];
-            Toast.makeText(this, "Total Distance From all four points is "+totalDistance+ " meters",
-                    Toast.LENGTH_LONG).show();
+            Location.distanceBetween(locations.get(2).latitude,locations.get(2).longitude,locations.get(3).latitude,locations.get(3).longitude,distanceCD);
+            Location.distanceBetween(locations.get(3).latitude,locations.get(3).longitude,locations.get(1).latitude,locations.get(1).longitude,distanceDA);
+            float totalDistance = distanceAB[0] + distanceBC[0] + distanceCD[0] + distanceDA[0];
+            double dis = Math.round((totalDistance/1000) * 100.0) / 100.0;
+            Toast.makeText(this, "Total Distance From all four points is "+dis+ " kms",
+                    Toast.LENGTH_SHORT).show();
         }
     }
 
     @Override
     public void onPolylineClick(Polyline polyline) {
-        Toast.makeText(this, "WOOWOWOOWOW",
+        List<LatLng> locations = polyline.getPoints();
+        float[] distanceAB = new float[1];
+        float[] distanceBC = new float[1];
+        float[] distanceCD = new float[1];
+        float[] distanceDA = new float[1];
+        Location.distanceBetween(locations.get(0).latitude,locations.get(0).longitude,locations.get(1).latitude,locations.get(1).longitude,distanceAB);
+        Location.distanceBetween(locations.get(1).latitude,locations.get(1).longitude,locations.get(2).latitude,locations.get(2).longitude,distanceBC);
+        Location.distanceBetween(locations.get(2).latitude,locations.get(2).longitude,locations.get(3).latitude,locations.get(3).longitude,distanceCD);
+        Location.distanceBetween(locations.get(3).latitude,locations.get(3).longitude,locations.get(1).latitude,locations.get(1).longitude,distanceDA);
+        double dis1 = Math.round((distanceAB[0]/1000) * 100.0) / 100.0;
+        double dis2 = Math.round((distanceBC[0]/1000) * 100.0) / 100.0;
+        double dis3 = Math.round((distanceCD[0]/1000) * 100.0) / 100.0;
+        double dis4 = Math.round((distanceDA[0]/1000) * 100.0) / 100.0;
+        Toast.makeText(this, "A to B " + dis1 + " in kms \nB to C "
+                        + dis2 + " in kms \nC to D "
+                        + dis3 + " in kms \nD to A "
+                        + dis4 + " in kms",
                 Toast.LENGTH_LONG).show();
     }
 }
